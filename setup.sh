@@ -33,10 +33,3 @@ sudo chmod +x install.sh
 # Execute install.sh
 log_msg "[+] Running install.sh..."
 sudo ./install.sh
-
-if [ $? -eq 0 ]; then
-    log_msg "[✓] Installation complete!"
-else
-    log_msg "[!] Installation failed."
-    exit 1
-fi
