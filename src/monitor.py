@@ -147,10 +147,15 @@ def monitor_system(config: Config) -> None:
     logging.info("Memory Usage: %.2f%%", memory_usage)
     logging.info("Disk Usage: %.2f%%", disk_usage)
     
-    for sensor, temp in temperatures.items():
-        logging.info("%s: %.2f°C", sensor, temp)
-        if temp >= config.temp_threshold:
-            alert(config, f"High Temperature Alert - {sensor}", f"{sensor} temperature is too high: {temp:.2f}°C")
+    if temperatures:
+        for sensor, temp in temperatures.items():
+            if temp >= config.temp_threshold:
+                logging.error("Temperature: Error - High Temperature Alert - %s: %.2f°C", sensor, temp)
+                alert(config, f"High Temperature Alert - {sensor}", f"{sensor} temperature is too high: {temp:.2f}°C")
+            else:
+                logging.info("Temperature: Normal - %s: %.2f°C", sensor, temp)
+    else:
+        logging.info("Temperature: No temperature sensors found.")
     
     if cpu_usage >= config.cpu_threshold:
         alert(config, "High CPU Usage Alert", f"CPU usage is too high: {cpu_usage:.2f}%")
