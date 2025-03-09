@@ -1,0 +1,23 @@
+# Treat all text files as UTF-8
+* text=auto eol=lf
+
+# Python scripts
+*.py linguist-language=Python
+
+# Shell scripts
+*.sh linguist-language=Shell
+
+# Ignore binary files for diff
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.zip binary
+*.tar binary
+*.gz binary
+*.tgz binary
+
+# Keep line endings consistent
+*.sh eol=lf
+*.py eol=lf
