@@ -59,16 +59,16 @@ install_packages() {
     local missing_packages=""
     local pkg
 
-    # List of packages to check
-    for pkg in python3-pip git python3-psutil python3-dotenv logrotate; do
+    # Lijst met alle benodigde pakketten
+    for pkg in python3-pip git python3-psutil python3-dotenv lm-sensors python3-smbus logrotate; do
         if ! dpkg -s "$pkg" >/dev/null 2>&1; then
             missing_packages="$missing_packages $pkg"
         fi
     done
 
     if [ -n "$missing_packages" ]; then
-        log_msg "[+] Installing missing packages:$missing_packages"
-        sudo apt install -y $missing_packages >/dev/null 2>&1 & spinner $!
+        log_msg "[+] Installing missing packages: $missing_packages"
+        sudo apt install -y $missing_packages
         log_msg "[+] Missing packages installed."
     else
         log_msg "[+] All required packages are already installed. Skipping."

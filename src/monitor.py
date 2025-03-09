@@ -5,6 +5,8 @@ import psutil
 import subprocess
 import socket
 import time
+import platform
+
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from pathlib import Path
@@ -74,18 +76,38 @@ def get_network_usage() -> dict:
 def get_system_uptime() -> float:
     return time.time() - psutil.boot_time()
 
-def get_gpu_temperature() -> float:
-    try:
-        result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=temperature.gpu", "--format=csv,noheader,nounits"],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        return float(result.stdout.strip())
-    except Exception as e:
-        logging.warning("GPU monitoring is unavailable: %s", e)
-        return None
+def get_temperatures() -> dict:
+    temperatures = {}
+    if platform.system() == "Windows":
+        try:
+            import wmi
+            sensor_info = wmi.WMI(namespace="root\\WMI").MSAcpi_ThermalZoneTemperature()
+            for idx, sensor in enumerate(sensor_info):
+                temperatures[f"Sensor_{idx}"] = round(sensor.CurrentTemperature / 10 - 273.15, 2)
+        except Exception as e:
+            logging.warning("Windows temperature monitoring is unavailable: %s", e)
+    elif platform.system() == "Linux":
+        try:
+            output = subprocess.run(["sensors"], capture_output=True, text=True).stdout
+            for line in output.split("\n"):
+                if "temp" in line.lower():
+                    parts = line.split(":")
+                    if len(parts) == 2:
+                        sensor_name = parts[0].strip()
+                        temp_value = parts[1].split()[0].replace("°C", "").strip()
+                        temperatures[sensor_name] = float(temp_value)
+        except Exception as e:
+            logging.warning("Linux temperature monitoring is unavailable: %s", e)
+    return temperatures
+
+def get_cpu_usage() -> float:
+    return psutil.cpu_percent(interval=1)
+
+def get_memory_usage() -> float:
+    return psutil.virtual_memory().percent
+
+def get_disk_usage() -> float:
+    return psutil.disk_usage("/").percent
 
 def send_email(config: Config, subject: str, body: str) -> None:
     msg = MIMEMultipart()
@@ -108,32 +130,34 @@ def alert(config: Config, subject: str, body: str) -> None:
     else:
         logging.warning("[Email Alert] %s: %s", subject, body)
 
-def shutdown_system(config: Config, reason: str) -> None:
-    logging.error("Shutting down due to: %s", reason)
-    alert(config, "System Shutdown Alert", f"Your system is shutting down because: {reason}")
-    subprocess.run(["sudo", "shutdown", "now"], check=False)
-
 def monitor_system(config: Config) -> None:
     hostname = get_hostname()
     network_usage = get_network_usage()
     uptime_hours = get_system_uptime() / 3600
-    gpu_temp = get_gpu_temperature()
+    temperatures = get_temperatures()
+    cpu_usage = get_cpu_usage()
+    memory_usage = get_memory_usage()
+    disk_usage = get_disk_usage()
     
     logging.info("Hostname: %s", hostname)
     logging.info("System Uptime: %.2f hours", uptime_hours)
-    logging.info("Network Usage - Sent: %d bytes, Received: %d bytes", 
+    logging.info("Network Usage - Sent: %d bytes, Received: %d bytes",
                  network_usage['bytes_sent'], network_usage['bytes_received'])
+    logging.info("CPU Usage: %.2f%%", cpu_usage)
+    logging.info("Memory Usage: %.2f%%", memory_usage)
+    logging.info("Disk Usage: %.2f%%", disk_usage)
     
-    if gpu_temp is not None:
-        logging.info("GPU Temperature: %.2f°C", gpu_temp)
-        if gpu_temp >= config.temp_threshold:
-            alert(config, "High GPU Temperature Alert", f"GPU temperature is too high: {gpu_temp:.2f}°C")
+    for sensor, temp in temperatures.items():
+        logging.info("%s: %.2f°C", sensor, temp)
+        if temp >= config.temp_threshold:
+            alert(config, f"High Temperature Alert - {sensor}", f"{sensor} temperature is too high: {temp:.2f}°C")
     
-    if uptime_hours > 168:  # 7 days
-        alert(config, "High System Uptime Alert", f"System has been running for {uptime_hours:.2f} hours")
-    
-    if network_usage['bytes_received'] > 10**9 or network_usage['bytes_sent'] > 10**9:
-        alert(config, "High Network Usage Alert", "More than 1GB of data transferred.")
+    if cpu_usage >= config.cpu_threshold:
+        alert(config, "High CPU Usage Alert", f"CPU usage is too high: {cpu_usage:.2f}%")
+    if memory_usage >= config.memory_threshold:
+        alert(config, "High Memory Usage Alert", f"Memory usage is too high: {memory_usage:.2f}%")
+    if disk_usage >= config.disk_threshold:
+        alert(config, "High Disk Usage Alert", f"Disk usage is too high: {disk_usage:.2f}%")
 
 def main() -> None:
     try:
