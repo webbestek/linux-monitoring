@@ -1,0 +1,10 @@
+[LOG_DIRECTORY]/monitoring.log {
+    daily
+    rotate 7
+    compress
+    missingok
+    notifempty
+    size 10M
+    dateext
+    maxage 7
+}

@@ -1,0 +1,6 @@
+[Unit]
+Description=Linux Monitoring Service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 [MONITORING_SCRIPT_PATH]
